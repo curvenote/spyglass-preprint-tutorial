@@ -2,7 +2,7 @@
 # Runs once at image build time, as the notebook user.
 # 1. Initialise a MySQL 8.0 data directory baked into the image (root / "tutorial",
 #    matching Spyglass's own tutorial config and docker-compose defaults).
-# 2. Write a DataJoint/Spyglass config so notebooks connect with no setup.
+# 2. Point the global DataJoint config at the repo's dj_local_conf.json.
 set -euo pipefail
 
 MYSQL_HOME="${HOME}/.spyglass-mysql"
@@ -59,31 +59,7 @@ SQL
 mysqladmin --defaults-file="${MYSQL_HOME}/my.cnf" -u root --password=tutorial shutdown
 wait || true
 
-# Global DataJoint config (~/.datajoint_config.json), found from any working dir.
-python - <<PY
-import json, os
-base = os.path.expanduser("~/spyglass_data")
-cfg = {
-    "database.host": "127.0.0.1",
-    "database.port": 3306,
-    "database.user": "root",
-    "database.password": "tutorial",
-    "database.reconnect": True,
-    "database.use_tls": False,
-    "loglevel": "INFO",
-    "safemode": True,
-    "fetch_format": "array",
-    "enable_python_native_blobs": True,
-    "filepath_checksum_size_limit": 1073741824,
-    "stores": {
-        s: {"protocol": "file", "location": f"{base}/{s}", "stage": f"{base}/{s}"}
-        for s in ("raw", "analysis")
-    },
-    "custom": {
-        "spyglass_dirs": {"base": base},
-        "kachery_zone": "franklab.collaborators",
-    },
-}
-with open(os.path.expanduser("~/.datajoint_config.json"), "w") as f:
-    json.dump(cfg, f, indent=2)
-PY
+# The tutorial notebooks load ./dj_local_conf.json from the repo root (= $HOME).
+# Link the global DataJoint config to it, so scripts run from anywhere use the
+# same settings.
+ln -sf "${HOME}/dj_local_conf.json" "${HOME}/.datajoint_config.json"
