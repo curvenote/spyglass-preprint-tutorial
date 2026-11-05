@@ -27,7 +27,23 @@ The upstream tutorials use two example files: `minirec20230622.nwb` (240 MB, a 4
 | `05_Export` | Runs. The DANDI upload step is skipped unless you add your own DANDI account details. |
 | `10_Spike_SortingV1` | Runs. Making the FigURL curation view needs a kachery account, so it's off by default. |
 | `20_Position_Trodes`, `24_Linearization`, `30_LFP`, `31_Theta` | Run. |
-| `40_Extracting_Clusterless_Waveform_Features`, `41_Decoding_Clusterless`, `42_Decoding_SortedSpikes` | **Ported to minirec.** Every step runs, but with ~10 s of position data the decoding results are only illustrative. 40 uses 8 of the 32 tetrodes to keep its run time reasonable on 1 CPU. |
+| `40_Extracting_Clusterless_Waveform_Features`, `41_Decoding_Clusterless`, `42_Decoding_SortedSpikes` | **Ported to minirec.** Every step runs, but with ~10 s of position data the decoding results are only illustrative. 40 uses 8 of the 32 tetrodes and still takes about 15 minutes on 1 CPU. It uses a 50 µV spike threshold, since lower thresholds detect mostly noise and run the decoder out of memory. 42 decodes from all 3 minirec units, which notebook 10's curation labels as noise. |
+
+### Run times and memory
+
+Measured by running every notebook in order in a fresh container limited to 2 GB / 1 CPU. Peak memory includes file cache.
+
+| Notebook | Time | Peak memory |
+| --- | --- | --- |
+| 00 smoke test | 31 s | 0.8 GiB |
+| 01, 02, 04, 05 | 3–41 s each | ≤ 0.9 GiB |
+| 10 spike sorting | 2.3 min | 0.9 GiB |
+| 20, 24, 30, 31 | 9–57 s each | ≤ 0.9 GiB |
+| 40 waveform features | ~15 min | 1.2 GiB |
+| 41 clusterless decoding | 74 s | 1.2 GiB |
+| 42 sorted-spikes decoding | 20 s | 1.0 GiB |
+
+The whole sequence takes about 25 minutes, most of it in notebook 40.
 
 Every change from the upstream notebooks is marked with a `# Binder hub:` comment, or a **Binder hub:** note in the text.
 
