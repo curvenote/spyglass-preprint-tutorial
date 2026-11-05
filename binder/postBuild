@@ -1,0 +1,83 @@
+#!/bin/bash
+# Runs once at image build time, as the notebook user.
+# 1. Initialise a MySQL 8.0 data directory baked into the image (root / "tutorial",
+#    matching Spyglass's own tutorial config and docker-compose defaults).
+# 2. Write a DataJoint/Spyglass config so notebooks connect with no setup.
+set -euo pipefail
+
+MYSQL_HOME="${HOME}/.spyglass-mysql"
+SPYGLASS_BASE="${HOME}/spyglass_data"
+mkdir -p "${MYSQL_HOME}" "${SPYGLASS_BASE}"
+
+# Small-footprint server: the whole user server has a 2G memory limit.
+cat > "${MYSQL_HOME}/my.cnf" <<CNF
+[mysqld]
+datadir=${MYSQL_HOME}/data
+socket=${MYSQL_HOME}/mysqld.sock
+pid-file=${MYSQL_HOME}/mysqld.pid
+log-error=${MYSQL_HOME}/mysqld.log
+# Only reachable from inside this user's pod.
+bind-address=127.0.0.1
+port=3306
+mysqlx=OFF
+skip-log-bin
+performance_schema=OFF
+innodb_buffer_pool_size=64M
+innodb_log_buffer_size=8M
+innodb_redo_log_capacity=64M
+max_connections=30
+table_open_cache=400
+tmp_table_size=16M
+max_heap_table_size=16M
+key_buffer_size=8M
+thread_cache_size=4
+# DataJoint stores blobs; keep the default 64M packet limit explicit.
+max_allowed_packet=64M
+
+[client]
+socket=${MYSQL_HOME}/mysqld.sock
+CNF
+
+mysqld --defaults-file="${MYSQL_HOME}/my.cnf" --initialize-insecure
+mysqld --defaults-file="${MYSQL_HOME}/my.cnf" &
+for i in $(seq 1 60); do
+  mysqladmin --defaults-file="${MYSQL_HOME}/my.cnf" -u root ping >/dev/null 2>&1 && break
+  sleep 1
+done
+mysql --defaults-file="${MYSQL_HOME}/my.cnf" -u root <<SQL
+ALTER USER 'root'@'localhost' IDENTIFIED BY 'tutorial';
+CREATE USER 'root'@'127.0.0.1' IDENTIFIED BY 'tutorial';
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'127.0.0.1' WITH GRANT OPTION;
+FLUSH PRIVILEGES;
+SQL
+mysqladmin --defaults-file="${MYSQL_HOME}/my.cnf" -u root --password=tutorial shutdown
+wait || true
+
+# Global DataJoint config (~/.datajoint_config.json), found from any working dir.
+python - <<PY
+import json, os
+base = os.path.expanduser("~/spyglass_data")
+cfg = {
+    "database.host": "127.0.0.1",
+    "database.port": 3306,
+    "database.user": "root",
+    "database.password": "tutorial",
+    "database.reconnect": True,
+    "database.use_tls": False,
+    "loglevel": "INFO",
+    "safemode": True,
+    "fetch_format": "array",
+    "enable_python_native_blobs": True,
+    "filepath_checksum_size_limit": 1073741824,
+    "stores": {
+        s: {"protocol": "file", "location": f"{base}/{s}", "stage": f"{base}/{s}"}
+        for s in ("raw", "analysis")
+    },
+    "custom": {
+        "spyglass_dirs": {"base": base},
+        "kachery_zone": "franklab.collaborators",
+    },
+}
+with open(os.path.expanduser("~/.datajoint_config.json"), "w") as f:
+    json.dump(cfg, f, indent=2)
+PY

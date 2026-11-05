@@ -1,0 +1,9 @@
+# OpenCV runtime (hhmi-spyglass-image used libgl1-mesa-glx, which Ubuntu 24.04 renamed)
+libgl1
+libglib2.0-0
+graphviz
+# MySQL 8.0 client + server binaries. The 2i2c hub runs MySQL as a sidecar
+# container; this hub cannot, so the server runs inside the user container
+# (configured in postBuild, started by start).
+mysql-client-core-8.0
+mysql-server-core-8.0
