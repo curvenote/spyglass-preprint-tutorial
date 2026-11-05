@@ -20,6 +20,19 @@ All build configuration is in [`binder/`](binder/). repo2docker reads only that 
 | `binder/apt.txt` | OpenCV runtime libraries, graphviz, and the MySQL 8.0 server and client. |
 | `binder/postBuild` | At build time: creates an empty MySQL data directory (user `root`, password `tutorial`) and writes `~/.datajoint_config.json`. |
 | `binder/start` | Every time a server starts: starts MySQL on `127.0.0.1:3306` and links the NWB files from the shared data folder into `~/spyglass_data/raw`. |
+| `binder/resolved-packages.txt` | For reference only: every conda, pip and apt package version in the tested image. repo2docker does not read it. |
+
+Direct dependencies in `environment.yml` are pinned to exact versions. Transitive conda/pip dependencies and the Ubuntu packages are not, so compare a new build against `resolved-packages.txt` to see what changed.
+
+### Resource use (measured with a 2 GB / 1 CPU limit)
+
+| | |
+| --- | --- |
+| Image | 7.0 GB on disk (1.7 GB compressed); the conda env is 3.6 GB |
+| Build | ~4 min for the environment layer on a 4-CPU machine; expect roughly 6–10 min cold on the hub's 2-vCPU VM |
+| Server start | ~4 s until Jupyter is up (MySQL starts in ~1 s) |
+| Memory, idle | ~380 MiB (mysqld ~180 MiB, Jupyter ~145 MiB, rest page cache) |
+| Memory, during the smoke test | ~1.0 GiB peak, including page cache |
 
 ### Database
 
@@ -50,4 +63,14 @@ curl -L -o <shared-disk>/spyglass/raw/minirec20230622.nwb \
 ```bash
 pip install jupyter-repo2docker==2026.4.0
 repo2docker -v /path/to/shared:/home/jovyan/data .
+```
+
+To run the smoke test with the hub's limits and without a browser:
+
+```bash
+repo2docker --no-run --image-name spyglass-binder .
+docker run --rm --memory=2g --cpus=1 \
+  -e SHARED_DATA_DIR=/home/jovyan/data -v /path/to/shared:/home/jovyan/data:ro \
+  spyglass-binder \
+  jupyter nbconvert --to notebook --execute --output /tmp/out.ipynb 00_Spyglass_Smoke_Test.ipynb
 ```

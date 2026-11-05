@@ -7,7 +7,7 @@ set -euo pipefail
 
 MYSQL_HOME="${HOME}/.spyglass-mysql"
 SPYGLASS_BASE="${HOME}/spyglass_data"
-mkdir -p "${MYSQL_HOME}" "${SPYGLASS_BASE}"
+mkdir -p "${MYSQL_HOME}/files" "${SPYGLASS_BASE}"
 
 # Small-footprint server: the whole user server has a 2G memory limit.
 cat > "${MYSQL_HOME}/my.cnf" <<CNF
@@ -19,6 +19,8 @@ log-error=${MYSQL_HOME}/mysqld.log
 # Only reachable from inside this user's pod.
 bind-address=127.0.0.1
 port=3306
+# mysql-server-core has no /var/lib/mysql-files; keep LOAD DATA/OUTFILE in here.
+secure-file-priv=${MYSQL_HOME}/files
 mysqlx=OFF
 skip-log-bin
 performance_schema=OFF
@@ -40,8 +42,12 @@ CNF
 
 mysqld --defaults-file="${MYSQL_HOME}/my.cnf" --initialize-insecure
 mysqld --defaults-file="${MYSQL_HOME}/my.cnf" &
+MYSQLD_PID=$!
 for i in $(seq 1 60); do
   mysqladmin --defaults-file="${MYSQL_HOME}/my.cnf" -u root ping >/dev/null 2>&1 && break
+  if ! kill -0 "${MYSQLD_PID}" 2>/dev/null; then
+    cat "${MYSQL_HOME}/mysqld.log"; exit 1
+  fi
   sleep 1
 done
 mysql --defaults-file="${MYSQL_HOME}/my.cnf" -u root <<SQL
