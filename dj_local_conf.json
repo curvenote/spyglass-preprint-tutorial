@@ -1,0 +1,39 @@
+{
+    "database.host": "127.0.0.1",
+    "database.port": 3306,
+    "database.user": "root",
+    "database.password": "tutorial",
+    "database.reconnect": true,
+    "database.use_tls": false,
+    "connection.init_function": null,
+    "connection.charset": "",
+    "loglevel": "INFO",
+    "safemode": true,
+    "fetch_format": "array",
+    "display.limit": 12,
+    "display.width": 14,
+    "display.show_tuple_count": true,
+    "enable_python_native_blobs": true,
+    "filepath_checksum_size_limit": 1073741824,
+    "stores": {
+        "raw": {
+            "protocol": "file",
+            "location": "/home/jovyan/spyglass_data/raw",
+            "stage": "/home/jovyan/spyglass_data/raw"
+        },
+        "analysis": {
+            "protocol": "file",
+            "location": "/home/jovyan/spyglass_data/analysis",
+            "stage": "/home/jovyan/spyglass_data/analysis"
+        }
+    },
+    "custom": {
+        "spyglass_dirs": {
+            "base": "/home/jovyan/spyglass_data"
+        },
+        "kachery_dirs": {
+            "cloud": "/home/jovyan/spyglass_data/.kachery-cloud"
+        },
+        "kachery_zone": "franklab.collaborators"
+    }
+}

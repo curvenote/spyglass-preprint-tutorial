@@ -1,0 +1,54 @@
+# Spyglass environment for the curvenote BinderHub.
+#
+# Spyglass is installed from the commit that curvenote/spyglass tags as
+# `snapshot/biorxiv-v5` (the code described in bioRxiv v5 of the Spyglass
+# preprint). That commit is on LorenFrankLab/spyglass `master`, so it is
+# installed from upstream:
+#   6122f076918cb0bbda220d71419848e9d71150a7  (2026-01-22, 0.5.5a2.dev33)
+#
+# Conda packages follow that commit's environments/environment.yml; pip
+# packages follow its pyproject.toml. Changes are marked "hub:". Versions are
+# pinned to what resolved when this file was tested (repo2docker 2026.4.0);
+# binder/resolved-packages.txt has the full resolved set.
+name: spyglass
+channels:
+  - conda-forge
+  - franklab
+  - edeno
+dependencies:
+  - python=3.9.23  # spyglass CI (test-conda.yml) runs on 3.9
+  - pip=25.2
+  - bottleneck=1.5.0
+  - ipympl=0.9.7
+  # hub: matplotlib-base, not `matplotlib`, which adds Qt6 + LLVM (no GUI here)
+  - matplotlib-base=3.9.4
+  - non_local_detector=0.6.9  # brings jax/jaxlib 0.4.28 (CPU)
+  - numpy=1.26.4
+  - position_tools=0.2.2
+  - pybind11=3.1.0  # req by mountainsort4 -> isosplit5
+  - pydotplus=2.0.2
+  - pyfftw=0.12.0  # ghostipy req; upstream: <=0.12.0
+  # hub: dropped pytorch<1.12.0 (DeepLabCut only; nothing else imports torch,
+  # and it adds ~1 GB). DeepLabCut and MoSeq notebooks are not supported here.
+  - ripple_detection=1.5.1
+  - seaborn=0.13.2
+  - track_linearization=2.3.1
+  - pip:
+      - ghostipy==0.2.2 # for common_filter
+      - mountainsort4==1.0.7
+      # hub: added. spyglass.spikesorting.v1 and spyglass.decoding.v1 import
+      # kachery_cloud, but spyglass only lists it under [test] extras.
+      - kachery-cloud==0.4.2
+      - jupyterlab_myst==2.7.0  # MyST markdown in notebooks (as on the 2i2c hub)
+      - spyglass-neuro @ git+https://github.com/LorenFrankLab/spyglass.git@6122f076918cb0bbda220d71419848e9d71150a7
+      # Pins for spyglass's own direct requirements (it leaves most unpinned).
+      - datajoint==0.14.10
+      - ndx-franklab-novela==0.2.3
+      - ndx-optogenetics==0.2.0
+      - ndx-pose==0.2.2
+      - panel==1.4.5
+      - probeinterface==0.2.28
+      - pubnub==6.3.3
+      - pynwb==2.8.3
+      - sortingview==0.14.2
+      - spikeinterface==0.99.1

@@ -1,0 +1,65 @@
+#!/bin/bash
+# Runs once at image build time, as the notebook user.
+# 1. Initialise a MySQL 8.0 data directory baked into the image (root / "tutorial",
+#    matching Spyglass's own tutorial config and docker-compose defaults).
+# 2. Point the global DataJoint config at the repo's dj_local_conf.json.
+set -euo pipefail
+
+MYSQL_HOME="${HOME}/.spyglass-mysql"
+SPYGLASS_BASE="${HOME}/spyglass_data"
+mkdir -p "${MYSQL_HOME}/files" "${SPYGLASS_BASE}"
+
+# Small-footprint server: the whole user server has a 2G memory limit.
+cat > "${MYSQL_HOME}/my.cnf" <<CNF
+[mysqld]
+datadir=${MYSQL_HOME}/data
+socket=${MYSQL_HOME}/mysqld.sock
+pid-file=${MYSQL_HOME}/mysqld.pid
+log-error=${MYSQL_HOME}/mysqld.log
+# Only reachable from inside this user's pod.
+bind-address=127.0.0.1
+port=3306
+# mysql-server-core has no /var/lib/mysql-files; keep LOAD DATA/OUTFILE in here.
+secure-file-priv=${MYSQL_HOME}/files
+mysqlx=OFF
+skip-log-bin
+performance_schema=OFF
+innodb_buffer_pool_size=64M
+innodb_log_buffer_size=8M
+innodb_redo_log_capacity=64M
+max_connections=30
+table_open_cache=400
+tmp_table_size=16M
+max_heap_table_size=16M
+key_buffer_size=8M
+thread_cache_size=4
+# DataJoint stores blobs; keep the default 64M packet limit explicit.
+max_allowed_packet=64M
+
+[client]
+socket=${MYSQL_HOME}/mysqld.sock
+CNF
+
+mysqld --defaults-file="${MYSQL_HOME}/my.cnf" --initialize-insecure
+mysqld --defaults-file="${MYSQL_HOME}/my.cnf" &
+MYSQLD_PID=$!
+for i in $(seq 1 60); do
+  mysqladmin --defaults-file="${MYSQL_HOME}/my.cnf" -u root ping >/dev/null 2>&1 && break
+  if ! kill -0 "${MYSQLD_PID}" 2>/dev/null; then
+    cat "${MYSQL_HOME}/mysqld.log"; exit 1
+  fi
+  sleep 1
+done
+mysql --defaults-file="${MYSQL_HOME}/my.cnf" -u root <<SQL
+ALTER USER 'root'@'localhost' IDENTIFIED BY 'tutorial';
+CREATE USER 'root'@'127.0.0.1' IDENTIFIED BY 'tutorial';
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'127.0.0.1' WITH GRANT OPTION;
+FLUSH PRIVILEGES;
+SQL
+mysqladmin --defaults-file="${MYSQL_HOME}/my.cnf" -u root --password=tutorial shutdown
+wait || true
+
+# The tutorial notebooks load ./dj_local_conf.json from the repo root (= $HOME).
+# Link the global DataJoint config to it, so scripts run from anywhere use the
+# same settings.
+ln -sf "${HOME}/dj_local_conf.json" "${HOME}/.datajoint_config.json"
